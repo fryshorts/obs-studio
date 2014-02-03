@@ -1,12 +1,21 @@
 project(libobs)
 
+SET(FFMPEG_DIR "${CMAKE_SOURCE_DIR}/deps/ffmpeg")
+include_directories(${FFMPEG_DIR})
+
+SET(CMAKE_LIBRARY_PATH "${FFMPEG_DIR}/libswresample")
 find_package(Libswresample REQUIRED)
-include_directories(${Libswresample_INCLUDE_DIR})
+#include_directories(${Libswresample_INCLUDE_DIR})
+include_directories("${FFMPEG_DIR}/libswresample")
 add_definitions(${Libswresample_DEFINITIONS})
 
+SET(CMAKE_LIBRARY_PATH "${FFMPEG_DIR}/libavutil")
 find_package(Libavutil REQUIRED)
-include_directories(${Libavutil_INCLUDE_DIR})
+#include_directories(${Libavutil_INCLUDE_DIR})
+include_directories("${FFMPEG_DIR}/libavutil")
 add_definitions(${Libavutil_DEFINITIONS})
+
+message("${CMAKE_INCLUDE_PATH}")
 
 add_definitions(-DLIBOBS_EXPORTS)
 add_definitions(-DPTW32_STATIC_LIB)
