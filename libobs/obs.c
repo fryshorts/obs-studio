@@ -354,6 +354,9 @@ bool obs_reset_video(struct obs_video_info *ovi)
 {
 	struct obs_core_video *video = &obs->video;
 
+	ovi->output_width  &= 0xFFFFFFFC;
+	ovi->output_height &= 0xFFFFFFFE;
+
 	obs_free_video();
 
 	if (!ovi) {
