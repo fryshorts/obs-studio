@@ -8,6 +8,7 @@ set(linux-xshm_SOURCES
 	linux-xshm.c
 	xcursor.c
 	xshm-input.c
+	glx-input.c
 )
 set(linux-xshm_HEADERS
 	xcursor.h
@@ -22,6 +23,7 @@ target_link_libraries(linux-xshm
 	${X11_LIBRARIES}
 	${X11_XShm_LIB}
 	${X11_Xfixes_LIB}
+	${X11_Xcomposite_LIB}
 )
 
 install_obs_plugin(linux-xshm)
