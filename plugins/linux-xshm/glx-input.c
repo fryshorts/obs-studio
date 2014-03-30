@@ -27,47 +27,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define GLX_DATA(voidptr) struct glx_data *data = voidptr;
 
 struct glx_data {
-    Display *dpy;
-    Screen *screen;
-    Window root_window;
+	Display *dpy;
+	Screen *screen;
+	Window root_window;
 
-    int depth;
-    uint32_t width, height;
+	int depth;
+	uint32_t width, height;
 
-    GLuint tex;
-    Pixmap x11_pix;
-    GLXPixmap glx_pix;
-    GLXFBConfig *glx_fbconfigs;
+	Pixmap x11_pix;
+	GLXPixmap glx_pix;
+	GLXFBConfig *glx_fbconfigs;
 
-    /* offscreen texture and framebuffer */
-    GLuint fb;
-    texture_t buffer;
-};
-
-struct gs_texture {
-    device_t             device;
-    enum gs_texture_type type;
-    enum gs_color_format format;
-    GLenum               gl_format;
-    GLenum               gl_target;
-    GLint                gl_internal_format;
-    GLenum               gl_type;
-    GLuint               texture;
-    uint32_t             levels;
-    bool                 is_dynamic;
-    bool                 is_render_target;
-    bool                 gen_mipmaps;
-
-    samplerstate_t       cur_sampler;
-};
-
-struct gs_texture_2d {
-    struct gs_texture    base;
-
-    uint32_t             width;
-    uint32_t             height;
-    bool                 gen_mipmaps;
-    GLuint               unpack_buffer;
+	/* texture and dummy */
+	texture_t texture, dummy;
 };
 
 // glx functions
@@ -76,7 +48,7 @@ static PFNGLXRELEASETEXIMAGEEXTPROC glXReleaseTexImageEXT_func = NULL;
 
 static const char* glx_input_getname(const char* locale)
 {
-    return "GLX Screen Input";
+	return "GLX Screen Input";
 }
 
 
@@ -98,9 +70,7 @@ void glx_input_destroy(void *vptr)
 	if (data->glx_pix)
 		glXDestroyPixmap(data->dpy, data->glx_pix);
 
-	glDeleteTextures(1, &data->tex);
-
-	glDeleteFramebuffers(1, &data->fb);
+	texture_destroy(data->dummy);
 	texture_destroy(data->buffer);
 
 	gs_leavecontext();
@@ -145,7 +115,8 @@ static void *glx_input_create(obs_data_t settings, obs_source_t source)
 		CompositeRedirectAutomatic
 	);
 
-	data->x11_pix = XCompositeNameWindowPixmap(data->dpy, data->root_window);
+	data->x11_pix = XCompositeNameWindowPixmap(data->dpy,
+			data->root_window);
 
 	blog(LOG_DEBUG, "Redirected window to pixmap: %u", data->x11_pix);
 
@@ -176,16 +147,13 @@ static void *glx_input_create(obs_data_t settings, obs_source_t source)
 	glXReleaseTexImageEXT_func = (PFNGLXRELEASETEXIMAGEEXTPROC)
 		glXGetProcAddress((GLubyte*) "glXReleaseTexImageEXT");
 
-	glGenTextures(1, &data->tex);
-
-	blog(LOG_DEBUG, "Got Texture %u", data->tex);
-
 	data->width = winAttr.width;
 	data->height = winAttr.height;
 
-	glGenFramebuffers(1, &data->fb);
-	data->buffer = gs_create_texture(data->width, data->height,
-			GS_RGBA, 1, NULL, GS_DYNAMIC);
+	data->dummy = gs_create_texture(data->width, data->height,
+			GS_RGBA, 1, NULL, GS_GL_DUMMYTEX);
+	data->texture = gs_create_texture(data->width, data->height,
+			GS_RGBA, 1, NULL, 0);
 
 	const int pixmapAttribs[] = {
 		GLX_TEXTURE_TARGET_EXT, GLX_TEXTURE_2D_EXT,
@@ -206,66 +174,22 @@ fail:
 	return NULL;
 }
 
-static void glx_input_render_texture(struct glx_data *data)
-{
-	glEnable(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, data->tex);
-	glXBindTexImageEXT_func(data->dpy, data->glx_pix, GLX_FRONT_EXT, NULL);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-
-	gs_viewport_push();
-	gs_setviewport(0, 0, data->width, data->height);
-
-	glBegin(GL_QUADS);
-		glTexCoord2i(0, 0);
-		glVertex2f(-1, -1);
-
-		glTexCoord2i(1, 0);
-		glVertex2f(1, -1);
-
-		glTexCoord2i(1, 1);
-		glVertex2f(1, 1);
-
-		glTexCoord2i(0, 1);
-		glVertex2f(-1, 1);
-	glEnd();
-
-	gs_viewport_pop();
-
-	glXReleaseTexImageEXT_func(data->dpy, data->glx_pix, GLX_FRONT_EXT);
-}
-
 static void glx_input_video_tick(void *vptr, float seconds)
 {
 	GLX_DATA(vptr);
-
-	struct gs_texture_2d *tex_2d = (struct gs_texture_2d *) data->buffer;
-	struct gs_texture tex_base = (struct gs_texture) tex_2d->base;
+	GLuint *dummy_handle = texture_getobj(data->dummy);
 
 	gs_entercontext(obs_graphics());
-	glBindFramebuffer(GL_FRAMEBUFFER, data->fb);
 
-	glBindTexture(GL_TEXTURE_2D, tex_base.texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, data->width, data->height, 0,
-		GL_RGBA, GL_UNSIGNED_BYTE, 0);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	/* simply binding to the texture before doing the copy should just
+	 * associate the glx buffer with the texture object, even if it's
+	 * unbound or changes to another texture unit (I think) */
+	glBindTexture(GL_TEXTURE_2D, *dummy_handle);
+	glXBindTexImageEXT_func(data->dpy, data->glx_pix, GLX_FRONT_EXT, NULL);
 
-	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex_base.texture, 0);
-	GLenum buffers[1] = {
-		GL_COLOR_ATTACHMENT0
-	};
-	glDrawBuffers(1, buffers);
+	gs_copy_texture(data->texture, data->dummy);
 
-	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-		return;
-
-	glx_input_render_texture(data);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glXReleaseTexImageEXT_func(data->dpy, data->glx_pix, GLX_FRONT_EXT);
 
 	gs_leavecontext();
 }
@@ -277,9 +201,10 @@ static void glx_input_video_render(void *vptr, effect_t effect)
 	eparam_t image = effect_getparambyname(effect, "image");
 	effect_settexture(effect, image, data->buffer);
 
+	/* Jim should really make a way to push/pop states */
 	gs_enable_blending(false);
-
 	gs_draw_sprite(data->buffer, 0, 0, 0);
+	gs_enable_blending(true);
 }
 
 static uint32_t glx_input_getwidth(void *vptr)
