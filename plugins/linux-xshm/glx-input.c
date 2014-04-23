@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <GL/glu.h>
 #include <GL/glx.h>
 #include <obs.h>
+#include "xcursor.h"
 
 #define GLX_DATA(voidptr) struct glx_data *data = voidptr;
 
@@ -51,7 +52,7 @@ struct glx_data {
 	uint_fast32_t flags;
 };
 
-static const char* glx_input_getname(const char* locale)
+static const char* glx_getname(const char* locale)
 {
 	UNUSED_PARAMETER(locale);
 	return "GLX Screen Input";
@@ -227,7 +228,7 @@ static int_fast32_t glx_check_geometry(struct glx_data *data)
 	return 1;
 }
 
-static void glx_input_destroy(void *vptr)
+static void glx_destroy(void *vptr)
 {
 	GLX_DATA(vptr);
 
@@ -262,7 +263,7 @@ static void glx_input_destroy(void *vptr)
 	bfree(data);
 }
 
-static void *glx_input_create(obs_data_t settings, obs_source_t source)
+static void *glx_create(obs_data_t settings, obs_source_t source)
 {
 	UNUSED_PARAMETER(settings);
 	UNUSED_PARAMETER(source);
@@ -274,8 +275,6 @@ static void *glx_input_create(obs_data_t settings, obs_source_t source)
 	data->screen = XDefaultScreenOfDisplay(data->dpy);
 	//data->root_window = RootWindowOfScreen(data->screen);
 	data->window = 0x6000059;
-	data->width = data->screen->width;
-	data->height = data->screen->height;
 
 	int event_base, error_base;
 	if (!XCompositeQueryExtension(data->dpy, &event_base, &error_base)) {
@@ -310,11 +309,11 @@ static void *glx_input_create(obs_data_t settings, obs_source_t source)
 	return data;
 
 fail:
-	glx_input_destroy(data);
+	glx_destroy(data);
 	return NULL;
 }
 
-static void glx_input_video_tick(void *vptr, float seconds)
+static void glx_video_tick(void *vptr, float seconds)
 {
 	UNUSED_PARAMETER(seconds);
 	GLX_DATA(vptr);
@@ -332,7 +331,7 @@ static void glx_input_video_tick(void *vptr, float seconds)
 	gs_leavecontext();
 }
 
-static void glx_input_video_render(void *vptr, effect_t effect)
+static void glx_video_render(void *vptr, effect_t effect)
 {
 	GLX_DATA(vptr);
 
@@ -347,13 +346,13 @@ static void glx_input_video_render(void *vptr, effect_t effect)
 	gs_enable_blending(true);
 }
 
-static uint32_t glx_input_getwidth(void *vptr)
+static uint32_t glx_getwidth(void *vptr)
 {
 	GLX_DATA(vptr);
 	return data->width;
 }
 
-static uint32_t glx_input_getheight(void *vptr)
+static uint32_t glx_getheight(void *vptr)
 {
 	GLX_DATA(vptr);
 	return data->height;
@@ -363,11 +362,11 @@ struct obs_source_info glx_input = {
 	.id           = "glx_input",
 	.type         = OBS_SOURCE_TYPE_INPUT,
 	.output_flags = OBS_SOURCE_VIDEO,
-	.getname      = glx_input_getname,
-	.create       = glx_input_create,
-	.destroy      = glx_input_destroy,
-	.video_tick   = glx_input_video_tick,
-	.video_render = glx_input_video_render,
-	.getwidth     = glx_input_getwidth,
-	.getheight    = glx_input_getheight
+	.getname      = glx_getname,
+	.create       = glx_create,
+	.destroy      = glx_destroy,
+	.video_tick   = glx_video_tick,
+	.video_render = glx_video_render,
+	.getwidth     = glx_getwidth,
+	.getheight    = glx_getheight
 };
