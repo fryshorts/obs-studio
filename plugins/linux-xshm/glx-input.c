@@ -49,6 +49,9 @@ struct glx_data {
 	/* texture and dummy */
 	texture_t texture, dummy;
 
+	bool show_cursor;
+	xcursor_t *cursor;
+
 	uint_fast32_t flags;
 };
 
@@ -228,6 +231,27 @@ static int_fast32_t glx_check_geometry(struct glx_data *data)
 	return 1;
 }
 
+static void glx_update(void *vptr, obs_data_t settings)
+{
+	GLX_DATA(vptr);
+
+	data->show_cursor = obs_data_getbool(settings, "show_cursor");
+}
+
+static void glx_defaults(obs_data_t defaults)
+{
+	obs_data_setbool(defaults, "show_cursor", true);
+}
+
+static obs_properties_t glx_properties(const char *locale)
+{
+	obs_properties_t props = obs_properties_create(locale);
+
+	obs_properties_add_bool(props, "show_cursor", "Capture Cursor");
+
+	return props;
+}
+
 static void glx_destroy(void *vptr)
 {
 	GLX_DATA(vptr);
@@ -244,6 +268,7 @@ static void glx_destroy(void *vptr)
 	gs_entercontext(obs_graphics());
 
 	glx_release_texture(data);
+	xcursor_destroy(data->cursor);
 
 	if (data->glx_pix)
 		glXDestroyPixmap(data->dpy, data->glx_pix);
@@ -270,11 +295,12 @@ static void *glx_create(obs_data_t settings, obs_source_t source)
 
 	// create data structure
 	struct glx_data *data = bzalloc(sizeof(struct glx_data));
+	glx_update(data, settings);
 
 	data->dpy = XOpenDisplay(NULL);
 	data->screen = XDefaultScreenOfDisplay(data->dpy);
 	//data->root_window = RootWindowOfScreen(data->screen);
-	data->window = 0x6000059;
+	data->window = 0x800000d;
 
 	int event_base, error_base;
 	if (!XCompositeQueryExtension(data->dpy, &event_base, &error_base)) {
@@ -301,8 +327,9 @@ static void *glx_create(obs_data_t settings, obs_source_t source)
 	);
 
 	glx_server_info(data);
-
 	glx_check_geometry(data);
+
+	data->cursor = xcursor_init(data->dpy);
 
 	gs_leavecontext();
 
@@ -328,6 +355,8 @@ static void glx_video_tick(void *vptr, float seconds)
 
 	gs_copy_texture(data->texture, data->dummy);
 
+	xcursor_tick(data->cursor);
+
 	gs_leavecontext();
 }
 
@@ -344,6 +373,9 @@ static void glx_video_render(void *vptr, effect_t effect)
 	gs_enable_blending(false);
 	gs_draw_sprite(data->texture, 0, 0, 0);
 	gs_enable_blending(true);
+
+	if (data->show_cursor)
+		xcursor_render(data->cursor);
 }
 
 static uint32_t glx_getwidth(void *vptr)
@@ -365,6 +397,9 @@ struct obs_source_info glx_input = {
 	.getname      = glx_getname,
 	.create       = glx_create,
 	.destroy      = glx_destroy,
+	.update       = glx_update,
+	.defaults     = glx_defaults,
+	.properties   = glx_properties,
 	.video_tick   = glx_video_tick,
 	.video_render = glx_video_render,
 	.getwidth     = glx_getwidth,
