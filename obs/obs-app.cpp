@@ -24,6 +24,10 @@
 #include <obs-config.h>
 #include <obs.hpp>
 
+#include <QDir>
+#include <QString>
+#include <QTextStream>
+#include <QDateTime>
 #include <QProxyStyle>
 
 #include "qt-wrappers.hpp"
@@ -49,22 +53,16 @@ static string lastLogFile;
 
 string CurrentTimeString()
 {
-	time_t     now = time(0);
-	struct tm  tstruct;
-	char       buf[80];
-	tstruct = *localtime(&now);
-	strftime(buf, sizeof(buf), "%X", &tstruct);
-	return buf;
+	return QDateTime::currentDateTime()
+		.toString("hh:mm:ss")
+		.toStdString();
 }
 
 string CurrentDateTimeString()
 {
-	time_t     now = time(0);
-	struct tm  tstruct;
-	char       buf[80];
-	tstruct = *localtime(&now);
-	strftime(buf, sizeof(buf), "%Y-%m-%d, %X", &tstruct);
-	return buf;
+	return QDateTime::currentDateTime()
+		.toString("yyyy-MM-dd, hh:mm:ss")
+		.toStdString();
 }
 
 static void do_log(int log_level, const char *msg, va_list args, void *param)
@@ -227,32 +225,30 @@ void OBSApp::OBSInit()
 
 string OBSApp::GetVersionString() const
 {
-	stringstream ver;
+	QString str;
+	QTextStream ver(&str);
+
 	ver << "v" <<
 		LIBOBS_API_MAJOR_VER << "." <<
 		LIBOBS_API_MINOR_VER << "." <<
-		LIBOBS_API_PATCH_VER;
-
-	ver << " (";
+		LIBOBS_API_PATCH_VER << " (";
 
 #ifdef HAVE_OBSCONFIG_H
 	ver << OBS_VERSION << ", ";
 #endif
 
+	ver << ((sizeof(void *) == 8) ? "64bit," : "32bit,") << " ";
+
 #ifdef _WIN32
-	if (sizeof(void*) == 8)
-		ver << "64bit, ";
-	else
-		ver << "32bit, ";
-
-	ver << "windows)";
+	ver << "windows";
 #elif __APPLE__
-	ver << "mac)";
+	ver << "mac";
 #else /* assume linux for the time being */
-	ver << "linux)";
+	ver << "linux";
 #endif
+	ver << ")";
 
-	return ver.str();
+	return str.toStdString();
 }
 
 #ifdef __APPLE__
@@ -311,51 +307,11 @@ struct NoFocusFrameStyle : QProxyStyle
 		QProxyStyle::drawControl(element, option, painter, widget);
 	}
 };
-
-static bool get_token(lexer *lex, string &str, base_token_type type)
-{
-	base_token token;
-	if (!lexer_getbasetoken(lex, &token, IGNORE_WHITESPACE))
-		return false;
-	if (token.type != type)
-		return false;
-
-	str.assign(token.text.array, token.text.len);
-	return true;
-}
-
-static bool expect_token(lexer *lex, const char *str, base_token_type type)
-{
-	base_token token;
-	if (!lexer_getbasetoken(lex, &token, IGNORE_WHITESPACE))
-		return false;
-	if (token.type != type)
-		return false;
-
-	return strref_cmp(&token.text, str) == 0;
-}
-
 static uint64_t convert_log_name(const char *name)
 {
-	BaseLexer  lex;
-	string     year, month, day, hour, minute, second;
-
-	lexer_start(lex, name);
-
-	if (!get_token(lex, year,   BASETOKEN_DIGIT)) return 0;
-	if (!expect_token(lex, "-", BASETOKEN_OTHER)) return 0;
-	if (!get_token(lex, month,  BASETOKEN_DIGIT)) return 0;
-	if (!expect_token(lex, "-", BASETOKEN_OTHER)) return 0;
-	if (!get_token(lex, day,    BASETOKEN_DIGIT)) return 0;
-	if (!get_token(lex, hour,   BASETOKEN_DIGIT)) return 0;
-	if (!expect_token(lex, "-", BASETOKEN_OTHER)) return 0;
-	if (!get_token(lex, minute, BASETOKEN_DIGIT)) return 0;
-	if (!expect_token(lex, "-", BASETOKEN_OTHER)) return 0;
-	if (!get_token(lex, second, BASETOKEN_DIGIT)) return 0;
-
-	stringstream timestring;
-	timestring << year << month << day << hour << minute << second;
-	return std::stoull(timestring.str());
+	return QDateTime::fromString(name, "yyyy-MM-dd hh-mm-ss.txt")
+		.toString("yyyyMMddhhmmss")
+		.toULongLong();
 }
 
 static void delete_oldest_log(void)
@@ -401,45 +357,28 @@ static void delete_oldest_log(void)
 
 static void get_last_log(void)
 {
-	BPtr<char>       logDir(os_get_config_path("obs-studio/logs"));
-	struct os_dirent *entry;
-	os_dir_t         dir        = os_opendir(logDir);
-	uint64_t         highest_ts = 0;
+	QDir dir(os_get_config_path("obs-studio/logs"));
 
-	if (dir) {
-		while ((entry = os_readdir(dir)) != NULL) {
-			if (entry->directory || *entry->d_name == '.')
-				continue;
+	if (!dir.exists())
+		return NULL;
 
-			uint64_t ts = convert_log_name(entry->d_name);
+	QStringList files = dir.entryList(QDir::Files,
+		QDir::Name | QDir::Reversed);
 
-			if (ts > highest_ts) {
-				lastLogFile = entry->d_name;
-				highest_ts  = ts;
-			}
+	for (int i = 0; i < files.size(); ++i) {
+		if (convert_log_name(files.at(i).toUtf8().constData())) {
+			lastLogFile = files.at(i).toUtf8().constData();
+			break;
 		}
-
-		os_closedir(dir);
 	}
 }
 
 string GenerateTimeDateFilename(const char *extension)
 {
-	time_t    now = time(0);
-	char      file[256] = {};
-	struct tm *cur_time;
-
-	cur_time = localtime(&now);
-	snprintf(file, sizeof(file), "%d-%02d-%02d %02d-%02d-%02d.%s",
-			cur_time->tm_year+1900,
-			cur_time->tm_mon+1,
-			cur_time->tm_mday,
-			cur_time->tm_hour,
-			cur_time->tm_min,
-			cur_time->tm_sec,
-			extension);
-
-	return string(file);
+	return QDateTime::currentDateTime()
+		.toString("yyyy-MM-dd hh-mm-ss.%1")
+		.arg(extension)
+		.toStdString();
 }
 
 static void create_log_file(fstream &logFile)
