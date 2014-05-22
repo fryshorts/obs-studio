@@ -386,16 +386,16 @@ static bool openLogFile(QFile *file)
 	BPtr<char> logPath(os_get_config_path("obs-studio/logs/"));
 	QString fileName = QDateTime::currentDateTime()
 		.toString("yyyy-MM-dd hh:mm:ss")
-		.prepend((const char *) logPath)
 		.append(".txt");
 
-	file->setFileName(fileName);
+	file->setFileName(QString((const char *) logPath) + fileName);
 	if (!file->open(QIODevice::ReadWrite | QIODevice::Truncate)) {
 		blog(LOG_ERROR, "Failed to open log file");
 		return false;
 	}
 
 	base_set_log_handler(writeLog, file);
+	currentLogFile = fileName.toLocal8Bit().constData();
 
 	return true;
 }
