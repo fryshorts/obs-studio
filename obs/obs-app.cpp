@@ -15,7 +15,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 
-#include <time.h>
 #include <stdio.h>
 #include <sstream>
 #include <util/bmem.h>
@@ -26,6 +25,7 @@
 
 #include <QDir>
 #include <QString>
+#include <QRegExp>
 #include <QTextStream>
 #include <QDateTime>
 #include <QProxyStyle>
@@ -62,6 +62,14 @@ string CurrentDateTimeString()
 {
 	return QDateTime::currentDateTime()
 		.toString("yyyy-MM-dd, hh:mm:ss")
+		.toStdString();
+}
+
+string GenerateTimeDateFilename(const char *extension)
+{
+	return QDateTime::currentDateTime()
+		.toString("yyyy-MM-dd hh-mm-ss.")
+		.append(extension)
 		.toStdString();
 }
 
@@ -307,102 +315,92 @@ struct NoFocusFrameStyle : QProxyStyle
 		QProxyStyle::drawControl(element, option, painter, widget);
 	}
 };
-static uint64_t convert_log_name(const char *name)
+
+static void getLastLog(void)
 {
-	return QDateTime::fromString(name, "yyyy-MM-dd hh-mm-ss.txt")
-		.toString("yyyyMMddhhmmss")
-		.toULongLong();
-}
-
-static void delete_oldest_log(void)
-{
-	BPtr<char>       logDir(os_get_config_path("obs-studio/logs"));
-	string           oldestLog;
-	uint64_t         oldest_ts = -1;
-	struct os_dirent *entry;
-
-	unsigned int maxLogs = (unsigned int)config_get_uint(
-			App()->GlobalConfig(), "General", "MaxLogs");
-
-	os_dir_t dir = os_opendir(logDir);
-	if (dir) {
-		unsigned int count = 0;
-
-		while ((entry = os_readdir(dir)) != NULL) {
-			if (entry->directory || *entry->d_name == '.')
-				continue;
-
-			uint64_t ts = convert_log_name(entry->d_name);
-
-			if (ts) {
-				if (ts < oldest_ts) {
-					oldestLog = entry->d_name;
-					oldest_ts = ts;
-				}
-
-				count++;
-			}
-		}
-
-		os_closedir(dir);
-
-		if (count > maxLogs) {
-			stringstream delPath;
-
-			delPath << logDir << "/" << oldestLog;
-			os_unlink(delPath.str().c_str());
-		}
-	}
-}
-
-static void get_last_log(void)
-{
-	QDir dir(os_get_config_path("obs-studio/logs"));
+	BPtr<char> logPath(os_get_config_path("obs-studio/logs"));
+	QDir dir((const char *) logPath);
 
 	if (!dir.exists())
-		return NULL;
+		return;
 
-	QStringList files = dir.entryList(QDir::Files,
-		QDir::Name | QDir::Reversed);
+	QRegExp rx("^[0-9\\-:\\s]{19}\\.txt$");
+	QStringList logs = dir.entryList(QDir::Files,
+		QDir::Name | QDir::Reversed).filter(rx);
 
-	for (int i = 0; i < files.size(); ++i) {
-		if (convert_log_name(files.at(i).toUtf8().constData())) {
-			lastLogFile = files.at(i).toUtf8().constData();
-			break;
-		}
+	if (logs.size() < 2)
+		return;
+
+	lastLogFile = logs.at(1).toLocal8Bit().constData();
+}
+
+static void deleteOldLogs(void)
+{
+	BPtr<char> logPath(os_get_config_path("obs-studio/logs"));
+	qint64 maxLogs = config_get_uint(App()->GlobalConfig(),
+		"General", "MaxLogs");
+	QDir dir((const char*) logPath);
+
+	if (!dir.exists())
+		return;
+
+	QRegExp rx("^[0-9\\-:\\s]{19}\\.txt$");
+	QStringList logs = dir.entryList(QDir::Files, QDir::Name).filter(rx);
+
+	while (logs.size() > maxLogs)
+		dir.remove(logs.takeFirst());
+}
+
+static void writeLog(int log_level, const char *msg, va_list args, void *param)
+{
+	QTextStream stream((QFile *) param);
+	char str[4096];
+
+#ifndef _WIN32
+	va_list args2;
+	va_copy(args2, args);
+#endif
+
+	vsnprintf(str, 4095, msg, args);
+
+#ifdef _WIN32
+	OutputDebugStringA(str);
+	OutputDebugStringA("\n");
+#else
+	def_log_handler(log_level, msg, args2, nullptr);
+#endif
+
+	if (log_level <= LOG_INFO) {
+		stream << QDateTime::currentDateTime().toString("hh:mm:ss")
+			<< ": " << str << endl;
 	}
+
+#ifdef _WIN32
+	if (log_level <= LOG_ERROR && IsDebuggerPresent())
+		__debugbreak();
+#endif
 }
 
-string GenerateTimeDateFilename(const char *extension)
+static bool openLogFile(QFile *file)
 {
-	return QDateTime::currentDateTime()
-		.toString("yyyy-MM-dd hh-mm-ss.%1")
-		.arg(extension)
-		.toStdString();
-}
+	BPtr<char> logPath(os_get_config_path("obs-studio/logs/"));
+	QString fileName = QDateTime::currentDateTime()
+		.toString("yyyy-MM-dd hh:mm:ss")
+		.prepend((const char *) logPath)
+		.append(".txt");
 
-static void create_log_file(fstream &logFile)
-{
-	stringstream dst;
-
-	get_last_log();
-
-	currentLogFile = GenerateTimeDateFilename("txt");
-	dst << "obs-studio/logs/" << currentLogFile.c_str();
-
-	BPtr<char> path(os_get_config_path(dst.str().c_str()));
-	logFile.open(path,
-			ios_base::in | ios_base::out | ios_base::trunc);
-
-	if (logFile.is_open()) {
-		delete_oldest_log();
-		base_set_log_handler(do_log, &logFile);
-	} else {
+	file->setFileName(fileName);
+	if (!file->open(QIODevice::ReadWrite | QIODevice::Truncate)) {
 		blog(LOG_ERROR, "Failed to open log file");
+		return false;
 	}
+
+	base_set_log_handler(writeLog, file);
+
+	return true;
 }
 
-static int run_program(fstream &logFile, int argc, char *argv[])
+static int run_program(int argc, char *argv[])
 {
 	int ret = -1;
 	QCoreApplication::addLibraryPath(".");
@@ -411,7 +409,8 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 		OBSApp program(argc, argv);
 		OBSTranslator translator;
 
-		create_log_file(logFile);
+		deleteOldLogs();
+		getLastLog();
 
 		program.installTranslator(&translator);
 		program.setStyle(new NoFocusFrameStyle);
@@ -434,11 +433,16 @@ int main(int argc, char *argv[])
 
 	base_get_log_handler(&def_log_handler, nullptr);
 
-	fstream logFile;
+	QFile logFile;
+	openLogFile(&logFile);
 
-	int ret = run_program(logFile, argc, argv);
+	int ret = run_program(argc, argv);
 
 	blog(LOG_INFO, "Number of memory leaks: %ld", bnum_allocs());
 	base_set_log_handler(nullptr, nullptr);
+
+	if (logFile.isOpen())
+		logFile.close();
+
 	return ret;
 }
