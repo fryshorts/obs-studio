@@ -296,7 +296,7 @@ static void v4l2_device_list(obs_property_t prop, obs_data_t settings)
 	dirp = opendir("/sys/class/video4linux");
 	if (dirp) {
 		while ((dp = readdir(dirp)) != NULL) {
-			memset(device, 0, strlen(device));
+			memset(device, 0, 10);
 			strcat(device, "/dev/");
 			strcat(device, dp->d_name);
 			if ((fd = open(device, O_RDWR | O_NONBLOCK)) == -1) {
