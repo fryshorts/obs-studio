@@ -288,7 +288,7 @@ static void v4l2_device_list(obs_property_t prop, obs_data_t settings)
 	struct dirent *dp;
 	int fd;
 	struct v4l2_capability video_cap;
-	char device[10];
+	char device[48] = "/dev/";
 	bool first = true;
 
 	obs_property_list_clear(prop);
@@ -296,9 +296,8 @@ static void v4l2_device_list(obs_property_t prop, obs_data_t settings)
 	dirp = opendir("/sys/class/video4linux");
 	if (dirp) {
 		while ((dp = readdir(dirp)) != NULL) {
-			memset(device, 0, 10);
-			strcat(device, "/dev/");
-			strcat(device, dp->d_name);
+			device[5] = 0;
+			strncat(device, dp->d_name, 42);
 			if ((fd = open(device, O_RDWR | O_NONBLOCK)) == -1) {
 				continue;
 			}
