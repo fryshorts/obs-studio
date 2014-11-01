@@ -289,7 +289,7 @@ void OBSBasic::CreateDefaultScene()
 
 #ifdef __APPLE__
 	source = obs_source_create(OBS_SOURCE_TYPE_INPUT, "display_capture",
-			Str("Basic.DisplayCapture"), NULL);
+			Str("Basic.DisplayCapture"), NULL, nullptr);
 
 	if (source) {
 		obs_scene_add(scene, source);
@@ -404,7 +404,8 @@ bool OBSBasic::LoadService()
 
 	obs_data_t *settings = obs_data_get_obj(data, "settings");
 
-	service = obs_service_create(type, "default_service", settings);
+	service = obs_service_create(type, "default_service", settings,
+			nullptr);
 	obs_service_release(service);
 
 	obs_data_release(settings);
@@ -418,7 +419,8 @@ bool OBSBasic::InitService()
 	if (LoadService())
 		return true;
 
-	service = obs_service_create("rtmp_common", "default_service", nullptr);
+	service = obs_service_create("rtmp_common", "default_service", nullptr,
+			nullptr);
 	if (!service)
 		return false;
 	obs_service_release(service);
@@ -1446,7 +1448,8 @@ void OBSBasic::RenderMain(void *data, uint32_t cx, uint32_t cy)
 obs_service_t *OBSBasic::GetService()
 {
 	if (!service) {
-		service = obs_service_create("rtmp_common", NULL, NULL);
+		service = obs_service_create("rtmp_common", NULL, NULL,
+				nullptr);
 		obs_service_release(service);
 	}
 	return service;
@@ -1632,7 +1635,7 @@ void OBSBasic::ResetAudioDevice(const char *sourceId, const char *deviceName,
 		obs_data_t *settings = obs_data_create();
 		obs_data_set_string(settings, "device_id", deviceId);
 		source = obs_source_create(OBS_SOURCE_TYPE_INPUT,
-				sourceId, deviceDesc, settings);
+				sourceId, deviceDesc, settings, nullptr);
 		obs_data_release(settings);
 
 		obs_set_output_source(channel, source);
