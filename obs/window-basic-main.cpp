@@ -662,6 +662,7 @@ void OBSBasic::OBSInit()
 	obs_load_all_modules();
 
 	ResetOutputs();
+	CreateHotkeys();
 
 	if (!InitService())
 		throw "Failed to initialize service";
@@ -749,6 +750,77 @@ void OBSBasic::HotkeyTriggered(void *data, obs_hotkey_id id, bool pressed)
 			Q_ARG(obs_hotkey_id, id), Q_ARG(bool, pressed));
 }
 
+void OBSBasic::CreateHotkeys()
+{
+	auto LoadHotkeyData = [&](const char *name) -> OBSData
+	{
+		const char *info = config_get_string(basicConfig,
+				"Hotkeys", name);
+		if (!info)
+			return {};
+
+		blog(LOG_INFO, "Loading hotkey info: %s", info);
+
+		obs_data_t *data = obs_data_create_from_json(info);
+		if (!data)
+			return {};
+
+		OBSData res = data;
+		obs_data_release(data);
+		return res;
+	};
+
+	auto LoadHotkeyPair = [&](obs_hotkey_pair_id id, const char *name0,
+			const char *name1)
+	{
+		obs_data_array_t *array0 =
+			obs_data_get_array(LoadHotkeyData(name0), "bindings");
+		obs_data_array_t *array1 =
+			obs_data_get_array(LoadHotkeyData(name1), "bindings");
+
+		obs_hotkey_pair_load(id, array0, array1);
+		obs_data_array_release(array0);
+		obs_data_array_release(array1);
+	};
+
+#define MAKE_CALLBACK(pred, method) \
+	[](void *data, obs_hotkey_pair_id, obs_hotkey_t*, bool pressed) \
+	{ \
+		OBSBasic &basic = *static_cast<OBSBasic*>(data); \
+		if (pred && pressed) { \
+			method(); \
+			return true; \
+		} \
+		return false; \
+	}
+
+	streamingHotkeys = obs_hotkey_pair_register_frontend(
+			"StartStreaming",
+			Str("Basic.Hotkeys.StartStreaming"),
+			"StopStreaming",
+			Str("Basic.Hotkeys.StopStreaming"),
+			MAKE_CALLBACK(!basic.outputHandler->StreamingActive(),
+				basic.StartStreaming),
+			MAKE_CALLBACK(basic.outputHandler->StreamingActive(),
+				basic.StopStreaming),
+			this, this);
+	LoadHotkeyPair(streamingHotkeys, "StartStreaming", "StopStreaming");
+
+	recordingHotkeys = obs_hotkey_pair_register_frontend(
+			"StartRecording",
+			Str("Basic.Hotkeys.StartRecording"),
+			"StopRecording",
+			Str("Basic.Hotkeys.StopRecording"),
+			MAKE_CALLBACK(!basic.outputHandler->RecordingActive(),
+				basic.StartRecording),
+			MAKE_CALLBACK(basic.outputHandler->RecordingActive(),
+				basic.StopRecording),
+			this, this);
+	LoadHotkeyPair(recordingHotkeys, "StartRecording", "StopRecording");
+
+#undef MAKE_CALLBACK
+}
+
 OBSBasic::~OBSBasic()
 {
 	bool previewEnabled = obs_preview_enabled();
@@ -763,6 +835,8 @@ OBSBasic::~OBSBasic()
 	os_cpu_usage_info_destroy(cpuUsageInfo);
 
 	obs_hotkey_set_callback_routing_func(nullptr, nullptr);
+	obs_hotkey_pair_unregister(streamingHotkeys);
+	obs_hotkey_pair_unregister(recordingHotkeys);
 
 	service = nullptr;
 	outputHandler.reset();
