@@ -167,6 +167,7 @@ set(libobs_util_SOURCES
 	util/config-file.c
 	util/lexer.c
 	util/dstr.c
+	util/iir-filter.c
 	util/utf8.c
 	util/text-lookup.c
 	util/cf-parser.c)
@@ -187,6 +188,7 @@ set(libobs_util_HEADERS
 	util/darray.h
 	util/circlebuf.h
 	util/dstr.h
+	util/iir-filter.h
 	util/serializer.h
 	util/config-file.h
 	util/lexer.h
