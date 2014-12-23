@@ -71,8 +71,8 @@ struct obs_volmeter {
 	float                  vol_mag;
 	float                  vol_max;
 
-	struct iir_biquad2     k1;
-	struct iir_biquad2     k2;
+	struct iir_biquad2     k1[8];
+	struct iir_biquad2     k2[8];
 };
 
 static const char *fader_signals[] = {
@@ -288,17 +288,21 @@ static void volmeter_source_destroyed(void *vptr, calldata_t *calldata)
 }
 
 static void volmeter_sum_and_max(struct iir_biquad2 *k1, struct iir_biquad2 *k2,
-		float *data, size_t frames, float *sum, float *max)
+		const unsigned int channels, float *data,
+		const size_t frames, float *sum, float *max)
 {
 	float s  = *sum;
 	float m  = *max;
 
+	unsigned int chan = 0;
 	float mag;
 	for (float *c = data; c < data + frames; ++c) {
-		mag  = iir_biquad2_iterate(k1, *c);
-		mag  = iir_biquad2_iterate(k2, mag);
+		mag  = iir_biquad2_iterate(&k1[chan], *c);
+		mag  = iir_biquad2_iterate(&k2[chan], mag);
 		s   += mag * mag;
 		m    = (m > *c * *c) ? m : *c * *c;
+		if (++chan >= channels)
+			chan = 0;
 	}
 
 	*sum = s;
@@ -345,7 +349,8 @@ static bool volmeter_process_audio_data(obs_volmeter_t *volmeter,
 			: left;
 		samples = frames * volmeter->channels;
 
-		volmeter_sum_and_max(&volmeter->k1, &volmeter->k2, adata,
+		volmeter_sum_and_max(&volmeter->k1[0], &volmeter->k2[0],
+				volmeter->channels, adata,
 				samples, &volmeter->ival_sum,
 				&volmeter->ival_max);
 
@@ -406,10 +411,12 @@ static void volmeter_update_audio_settings(obs_volmeter_t *volmeter)
 	volmeter->update_frames   = volmeter->update_ms * sr / 1000;
 	volmeter->peakhold_frames = volmeter->peakhold_ms * sr / 1000;
 
-	iir_biquad2_calc(&volmeter->k1, IIR_HIGH_SHELF, K1_FC,
-			(float) sr * volmeter->channels, 0.0f, K1_GAIN);
-	iir_biquad2_calc(&volmeter->k2, IIR_HIGH_PASS, K2_FC,
-			(float) sr * volmeter->channels, K2_Q, 0.0f);
+	for (unsigned int i = 0; i < volmeter->channels; ++i) {
+		iir_biquad2_calc(&volmeter->k1[i], IIR_HIGH_SHELF, K1_FC,
+				(float) sr, 0.0f, K1_GAIN);
+		iir_biquad2_calc(&volmeter->k2[i], IIR_HIGH_PASS, K2_FC,
+				(float) sr, K2_Q, 0.0f);
+	}
 }
 
 obs_fader_t *obs_fader_create(enum obs_fader_type type)
