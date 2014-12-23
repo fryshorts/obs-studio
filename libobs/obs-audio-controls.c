@@ -305,25 +305,15 @@ static void volmeter_sum_and_max(struct iir_biquad2 *k1, struct iir_biquad2 *k2,
 	*max = m;
 }
 
-/**
- * @todo The IIR low pass filter has a different behavior depending on the
- *       update interval and sample rate, it should be replaced with something
- *       that is independent from both.
- */
 static void volmeter_calc_ival_levels(obs_volmeter_t *volmeter)
 {
-	const float alpha    = 0.15f;
 	const float frames   = (float) volmeter->ival_frames;
 	const float samples  = frames * (float) volmeter->channels;
 	const float ival_max = sqrtf(volmeter->ival_max);
 	const float ival_rms = sqrtf(volmeter->ival_sum / samples);
 
-	if (ival_max > volmeter->vol_max) {
-		volmeter->vol_max = ival_max;
-	} else {
-		volmeter->vol_max = alpha * volmeter->vol_max +
-				(1.0f - alpha) * ival_max;
-	}
+	volmeter->vol_max = ival_max;
+	volmeter->vol_mag = ival_rms;
 
 	if (volmeter->vol_max > volmeter->vol_peak ||
 			volmeter->peakhold_count > volmeter->peakhold_frames) {
@@ -332,9 +322,6 @@ static void volmeter_calc_ival_levels(obs_volmeter_t *volmeter)
 	} else {
 		volmeter->peakhold_count += frames;
 	}
-
-	volmeter->vol_mag = alpha * ival_rms +
-			volmeter->vol_mag * (1.0f - alpha);
 
 	/* reset interval data */
 	volmeter->ival_frames = 0;
