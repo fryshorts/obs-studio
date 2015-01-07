@@ -500,16 +500,12 @@ static void *pulse_create(obs_data_t *settings, obs_source_t *source)
 {
 	struct pulse_data *data = bzalloc(sizeof(struct pulse_data));
 
-	data->source   = source;
+	data->source = source;
 
 	pulse_init();
 	pulse_update(data, settings);
 
-	if (data->stream)
-		return data;
-
-	pulse_destroy(data);
-	return NULL;
+	return data;
 }
 
 struct obs_source_info pulse_input_capture = {
