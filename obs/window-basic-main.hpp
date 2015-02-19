@@ -68,6 +68,7 @@ private:
 
 	QNetworkAccessManager networkManager;
 
+	QPointer<QTimer>    diskUsageTimer;
 	QPointer<QTimer>    cpuUsageTimer;
 	os_cpu_usage_info_t *cpuUsageInfo = nullptr;
 
@@ -218,6 +219,10 @@ public:
 
 	void SaveService();
 	bool LoadService();
+
+	double GetRecordingFileSize() const;
+
+	double GetRemainingDiskSpace() const;
 
 protected:
 	virtual void closeEvent(QCloseEvent *event) override;
