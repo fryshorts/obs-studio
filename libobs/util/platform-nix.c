@@ -17,6 +17,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <dirent.h>
 #include <stdlib.h>
 #include <dlfcn.h>
@@ -248,7 +249,12 @@ void os_closedir(os_dir_t *dir)
 
 uint64_t os_remaining_disk_space_bytes(const char *disk)
 {
-	return 0;
+	struct statvfs fs;
+
+	if (!disk || statvfs(disk, &fs) < 0)
+		return 0;
+
+	return fs.f_bsize * fs.f_bfree;
 }
 
 struct posix_glob_info {
