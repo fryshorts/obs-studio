@@ -254,7 +254,7 @@ uint64_t os_remaining_disk_space_bytes(const char *disk)
 	if (!disk || statvfs(disk, &fs) < 0)
 		return 0;
 
-	return fs.f_bsize * fs.f_bfree;
+	return fs.f_bsize * fs.f_bavail;
 }
 
 struct posix_glob_info {
