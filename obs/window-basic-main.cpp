@@ -130,12 +130,10 @@ OBSBasic::OBSBasic(QWidget *parent)
 			ui->statusbar, SLOT(UpdateCPUUsage()));
 	cpuUsageTimer->start(3000);
 
-#ifdef _WIN32
 	diskUsageTimer = new QTimer(this);
 	connect(diskUsageTimer, SIGNAL(timeout()),
 		ui->statusbar, SLOT(UpdateDiskUsage()));
 	diskUsageTimer->start(3000);
-#endif
 
 	DeleteKeys =
 #ifdef __APPLE__

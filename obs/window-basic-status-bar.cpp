@@ -30,9 +30,7 @@ OBSBasicStatusBar::OBSBasicStatusBar(QWidget *parent)
 	addPermanentWidget(droppedFrames);
 	addPermanentWidget(sessionTime);
 	addPermanentWidget(cpuUsage);
-#ifdef _WIN32
 	addPermanentWidget(diskUsage);
-#endif
 	addPermanentWidget(kbps);
 }
 
