@@ -731,7 +731,7 @@ void OBSBasic::InitHotkeys()
 	obs_hotkeys_set_translations(&t);
 
 	obs_hotkeys_set_audio_hotkeys_translations(Str("Mute"), Str("Unmute"),
-			Str("Push-to-talk"));
+			Str("Push-to-mute"), Str("Push-to-talk"));
 
 	obs_hotkey_enable_callback_rerouting(true);
 	obs_hotkey_set_callback_routing_func(OBSBasic::HotkeyTriggered, this);

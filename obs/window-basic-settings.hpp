@@ -77,6 +77,14 @@ private:
 	OBSPropertiesView *streamEncoderProps = nullptr;
 	OBSPropertiesView *recordEncoderProps = nullptr;
 
+	using AudioSource_t =
+		std::tuple<OBSWeakSource,
+			QPointer<QCheckBox>, QPointer<QSpinBox>,
+			QPointer<QCheckBox>, QPointer<QSpinBox>>;
+	std::vector<AudioSource_t> audioSources;
+	OBSSignal sourceCreated;
+	OBSSignal channelChanged;
+
 	std::vector<std::pair<bool, QPointer<OBSHotkeyWidget>>> hotkeys;
 	OBSSignal hotkeyRegistered;
 	OBSSignal hotkeyUnregistered;
@@ -161,6 +169,7 @@ private:
 	void LoadListValues(QComboBox *widget, obs_property_t *prop,
 		const char *configName);
 	void LoadAudioDevices();
+	void LoadAudioSources();
 
 	/* video */
 	void LoadRendererList();
@@ -205,6 +214,7 @@ private slots:
 	void GeneralChanged();
 	void AudioChanged();
 	void AudioChangedRestart();
+	void ReloadAudioSources();
 	void OutputsChanged();
 	void Stream1Changed();
 	void VideoChanged();
