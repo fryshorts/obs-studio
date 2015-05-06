@@ -28,13 +28,11 @@ void VolControl::OBSVolumeLevel(void *data, calldata_t *calldata)
 	float peak      = calldata_float(calldata, "level");
 	float mag       = calldata_float(calldata, "magnitude");
 	float peakHold  = calldata_float(calldata, "peak");
-	bool  muted     = calldata_bool (calldata, "muted");
 
 	QMetaObject::invokeMethod(volControl, "VolumeLevel",
 		Q_ARG(float, mag),
 		Q_ARG(float, peak),
-		Q_ARG(float, peakHold),
-		Q_ARG(bool,  muted));
+		Q_ARG(float, peakHold));
 }
 
 void VolControl::OBSVolumeMuted(void *data, calldata_t *calldata)
@@ -51,18 +49,12 @@ void VolControl::VolumeChanged()
 	slider->blockSignals(true);
 	slider->setValue((int) (obs_fader_get_deflection(obs_fader) * 100.0f));
 	slider->blockSignals(false);
-	
+
 	updateText();
 }
 
-void VolControl::VolumeLevel(float mag, float peak, float peakHold, bool muted)
+void VolControl::VolumeLevel(float mag, float peak, float peakHold)
 {
-	if (muted) {
-		mag = 0.0f;
-		peak = 0.0f;
-		peakHold = 0.0f;
-	}
-
 	volMeter->setLevels(mag, peak, peakHold);
 }
 

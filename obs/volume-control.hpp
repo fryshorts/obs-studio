@@ -60,7 +60,7 @@ private:
 private slots:
 	void VolumeChanged();
 	void VolumeMuted(bool muted);
-	void VolumeLevel(float mag, float peak, float peakHold, bool muted);
+	void VolumeLevel(float mag, float peak, float peakHold);
 
 	void SetMuted(bool checked);
 	void SliderChanged(int vol);

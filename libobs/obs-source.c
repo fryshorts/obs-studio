@@ -855,7 +855,7 @@ static inline void handle_ts_jump(obs_source_t *source, uint64_t expected,
 }
 
 static void source_signal_audio_data(obs_source_t *source,
-		struct audio_data *in, bool muted)
+		struct audio_data *in)
 {
 	struct calldata data;
 
@@ -863,7 +863,6 @@ static void source_signal_audio_data(obs_source_t *source,
 
 	calldata_set_ptr(&data, "source", source);
 	calldata_set_ptr(&data, "data",   in);
-	calldata_set_bool(&data, "muted", muted);
 
 	signal_handler_signal(source->context.signals, "audio_data", &data);
 
@@ -931,7 +930,7 @@ static void source_output_audio_line(obs_source_t *source,
 		in.volume = 0.0f;
 
 	audio_line_output(source->audio_line, &in);
-	source_signal_audio_data(source, &in, muted);
+	source_signal_audio_data(source, &in);
 }
 
 enum convert_type {

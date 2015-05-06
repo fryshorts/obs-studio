@@ -69,6 +69,9 @@ struct obs_volmeter {
 	float                  vol_peak;
 	float                  vol_mag;
 	float                  vol_max;
+
+	bool muted;
+	bool enabled;
 };
 
 static const char *fader_signals[] = {
@@ -217,8 +220,7 @@ static void signal_volume_changed(signal_handler_t *sh,
 
 static void signal_levels_updated(signal_handler_t *sh,
 		struct obs_volmeter *volmeter,
-		const float level, const float magnitude, const float peak,
-		bool muted)
+		const float level, const float magnitude, const float peak)
 {
 	struct calldata data;
 
@@ -228,7 +230,6 @@ static void signal_levels_updated(signal_handler_t *sh,
 	calldata_set_float(&data, "level",     level);
 	calldata_set_float(&data, "magnitude", magnitude);
 	calldata_set_float(&data, "peak",      peak);
-	calldata_set_bool (&data, "muted",     muted);
 
 	signal_handler_signal(sh, "levels_updated", &data);
 
@@ -265,6 +266,28 @@ static void volmeter_source_volume_changed(void *vptr, calldata_t *calldata)
 
 	float mul = (float) calldata_float(calldata, "volume");
 	volmeter->cur_db = mul_to_db(mul);
+
+	pthread_mutex_unlock(&volmeter->mutex);
+}
+
+static void volmeter_source_mute_changed(void *vptr, calldata_t *calldata)
+{
+	struct obs_volmeter *volmeter = (struct obs_volmeter *) vptr;
+
+	pthread_mutex_lock(&volmeter->mutex);
+
+	volmeter->muted = calldata_bool(calldata, "muted");
+
+	pthread_mutex_unlock(&volmeter->mutex);
+}
+
+static void volmeter_source_enable_changed(void *vptr, calldata_t *calldata)
+{
+	struct obs_volmeter *volmeter = (struct obs_volmeter *) vptr;
+
+	pthread_mutex_lock(&volmeter->mutex);
+
+	volmeter->enabled = calldata_bool(calldata, "enabled");
 
 	pthread_mutex_unlock(&volmeter->mutex);
 }
@@ -396,7 +419,8 @@ static void volmeter_source_data_received(void *vptr, calldata_t *calldata)
 	updated = volmeter_process_audio_data(volmeter, data);
 
 	if (updated) {
-		mul   = db_to_mul(volmeter->cur_db);
+		mul   = (volmeter->muted || !volmeter->enabled) ?
+				0 : db_to_mul(volmeter->cur_db);
 
 		level = volmeter->db_to_pos(mul_to_db(volmeter->vol_max * mul));
 		mag   = volmeter->db_to_pos(mul_to_db(volmeter->vol_mag * mul));
@@ -408,8 +432,7 @@ static void volmeter_source_data_received(void *vptr, calldata_t *calldata)
 	pthread_mutex_unlock(&volmeter->mutex);
 
 	if (updated)
-		signal_levels_updated(sh, volmeter, level, mag, peak,
-				calldata_bool(calldata, "muted"));
+		signal_levels_updated(sh, volmeter, level, mag, peak);
 }
 
 static void volmeter_update_audio_settings(obs_volmeter_t *volmeter)
@@ -687,13 +710,19 @@ bool obs_volmeter_attach_source(obs_volmeter_t *volmeter, obs_source_t *source)
 	sh = obs_source_get_signal_handler(source);
 	signal_handler_connect(sh, "volume",
 			volmeter_source_volume_changed, volmeter);
+	signal_handler_connect(sh, "mute",
+			volmeter_source_mute_changed, volmeter);
+	signal_handler_connect(sh, "enable",
+			volmeter_source_enable_changed, volmeter);
 	signal_handler_connect(sh, "audio_data",
 			volmeter_source_data_received, volmeter);
 	signal_handler_connect(sh, "destroy",
 			volmeter_source_destroyed, volmeter);
 
-	volmeter->source = source;
-	volmeter->cur_db = mul_to_db(obs_source_get_volume(source));
+	volmeter->source  = source;
+	volmeter->cur_db  = mul_to_db(obs_source_get_volume(source));
+	volmeter->muted   = obs_source_muted(source);
+	volmeter->enabled = obs_source_enabled(source);
 
 	pthread_mutex_unlock(&volmeter->mutex);
 
@@ -715,6 +744,10 @@ void obs_volmeter_detach_source(obs_volmeter_t *volmeter)
 	sh = obs_source_get_signal_handler(volmeter->source);
 	signal_handler_disconnect(sh, "volume",
 			volmeter_source_volume_changed, volmeter);
+	signal_handler_disconnect(sh, "mute",
+			volmeter_source_mute_changed, volmeter);
+	signal_handler_disconnect(sh, "enable",
+			volmeter_source_enable_changed, volmeter);
 	signal_handler_disconnect(sh, "audio_data",
 			volmeter_source_data_received, volmeter);
 	signal_handler_disconnect(sh, "destroy",
