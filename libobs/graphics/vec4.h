@@ -18,7 +18,10 @@
 #pragma once
 
 #include "math-defs.h"
+
+#if HAVE_SSE
 #include <xmmintrin.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -33,24 +36,47 @@ struct vec4 {
 			float x, y, z, w;
 		};
 		float ptr[4];
+#if HAVE_SSE
 		__m128 m;
+#endif
 	};
 };
 
 static inline void vec4_zero(struct vec4 *v)
 {
+#if HAVE_SSE
 	v->m = _mm_setzero_ps();
+#else
+	v->x = 0.0f;
+	v->y = 0.0f;
+	v->z = 0.0f;
+	v->w = 0.0f;
+#endif
 }
 
 static inline void vec4_set(struct vec4 *dst, float x, float y, float z,
 		float w)
 {
+#if HAVE_SSE
 	dst->m = _mm_set_ps(w, z, y, x);
+#else
+	dst->x = x;
+	dst->y = y;
+	dst->z = z;
+	dst->w = w;
+#endif
 }
 
 static inline void vec4_copy(struct vec4 *dst, const struct vec4 *v)
 {
+#if HAVE_SSE
 	dst->m = v->m;
+#else
+	dst->x = v->x;
+	dst->y = v->y;
+	dst->z = v->z;
+	dst->w = v->w;
+#endif
 }
 
 EXPORT void vec4_from_vec3(struct vec4 *dst, const struct vec3 *v);
@@ -58,58 +84,118 @@ EXPORT void vec4_from_vec3(struct vec4 *dst, const struct vec3 *v);
 static inline void vec4_add(struct vec4 *dst, const struct vec4 *v1,
 		const struct vec4 *v2)
 {
+#if HAVE_SSE
 	dst->m = _mm_add_ps(v1->m, v2->m);
+#else
+	dst->x = v1->x + v2->x;
+	dst->y = v1->y + v2->y;
+	dst->z = v1->z + v2->z;
+	dst->w = v1->w + v2->w;
+#endif
 }
 
 static inline void vec4_sub(struct vec4 *dst, const struct vec4 *v1,
 		const struct vec4 *v2)
 {
+#if HAVE_SSE
 	dst->m = _mm_sub_ps(v1->m, v2->m);
+#else
+	dst->x = v1->x - v2->x;
+	dst->y = v1->y - v2->y;
+	dst->z = v1->z - v2->z;
+	dst->w = v1->w - v2->w;
+#endif
 }
 
 static inline void vec4_mul(struct vec4 *dst, const struct vec4 *v1,
 		const struct vec4 *v2)
 {
+#if HAVE_SSE
 	dst->m = _mm_mul_ps(v1->m, v2->m);
+#else
+	dst->x = v1->x * v2->x;
+	dst->y = v1->y * v2->y;
+	dst->z = v1->z * v2->z;
+	dst->w = v1->w * v2->w;
+#endif
 }
 
 static inline void vec4_div(struct vec4 *dst, const struct vec4 *v1,
 		const struct vec4 *v2)
 {
+#if HAVE_SSE
 	dst->m = _mm_div_ps(v1->m, v2->m);
+#else
+	dst->x = v1->x / v2->x;
+	dst->y = v1->y / v2->y;
+	dst->z = v1->z / v2->z;
+	dst->w = v1->w / v2->w;
+#endif
 }
 
 static inline void vec4_addf(struct vec4 *dst, const struct vec4 *v,
 		float f)
 {
+#if HAVE_SSE
 	dst->m = _mm_add_ps(v->m, _mm_set1_ps(f));
+#else
+	dst->x = v->x + f;
+	dst->y = v->y + f;
+	dst->z = v->z + f;
+	dst->w = v->w + f;
+#endif
 }
 
 static inline void vec4_subf(struct vec4 *dst, const struct vec4 *v,
 		float f)
 {
+#if HAVE_SSE
 	dst->m = _mm_sub_ps(v->m, _mm_set1_ps(f));
+#else
+	dst->x = v->x - f;
+	dst->y = v->y - f;
+	dst->z = v->z - f;
+	dst->w = v->w - f;
+#endif
 }
 
 static inline void vec4_mulf(struct vec4 *dst, const struct vec4 *v,
 		float f)
 {
+#if HAVE_SSE
 	dst->m = _mm_mul_ps(v->m, _mm_set1_ps(f));
+#else
+	dst->x = v->x * f;
+	dst->y = v->y * f;
+	dst->z = v->z * f;
+	dst->w = v->w * f;
+#endif
 }
 
 static inline void vec4_divf(struct vec4 *dst, const struct vec4 *v,
 		float f)
 {
+#if HAVE_SSE
 	dst->m = _mm_div_ps(v->m, _mm_set1_ps(f));
+#else
+	dst->x = v->x / f;
+	dst->y = v->y / f;
+	dst->z = v->z / f;
+	dst->w = v->w / f;
+#endif
 }
 
 static inline float vec4_dot(const struct vec4 *v1, const struct vec4 *v2)
 {
+#if HAVE_SSE
 	struct vec4 add;
 	__m128 mul = _mm_mul_ps(v1->m, v2->m);
 	add.m = _mm_add_ps(_mm_movehl_ps(mul, mul), mul);
 	add.m = _mm_add_ps(_mm_shuffle_ps(add.m, add.m, 0x55), add.m);
 	return add.x;
+#else
+	return v1->x * v2->x + v1->y * v2->y + v1->z * v2->z + v1->w * v2->w;
+#endif
 }
 
 static inline void vec4_neg(struct vec4 *dst, const struct vec4 *v)
@@ -139,9 +225,16 @@ static inline float vec4_dist(const struct vec4 *v1, const struct vec4 *v2)
 static inline void vec4_norm(struct vec4 *dst, const struct vec4 *v)
 {
 	float dot_val = vec4_dot(v, v);
+#if HAVE_SSE
 	dst->m = (dot_val > 0.0f) ?
 		_mm_mul_ps(v->m, _mm_set1_ps(1.0f/sqrtf(dot_val))) :
 		_mm_setzero_ps();
+#else
+	if (dot_val > 0.0f)
+		vec4_mulf(dst, v, 1.0f/sqrtf(dot_val));
+	else
+		vec4_zero(dst);
+#endif
 }
 
 static inline int vec4_close(const struct vec4 *v1, const struct vec4 *v2,
@@ -158,25 +251,53 @@ static inline int vec4_close(const struct vec4 *v1, const struct vec4 *v2,
 static inline void vec4_min(struct vec4 *dst, const struct vec4 *v1,
 		const struct vec4 *v2)
 {
+#if HAVE_SSE
 	dst->m = _mm_min_ps(v1->m, v2->m);
+#else
+	dst->x = (v1->x < v2->x) ? v1->x : v2->x;
+	dst->y = (v1->y < v2->y) ? v1->y : v2->y;
+	dst->z = (v1->z < v2->z) ? v1->z : v2->z;
+	dst->w = (v1->w < v2->w) ? v1->w : v2->w;
+#endif
 }
 
 static inline void vec4_minf(struct vec4 *dst, const struct vec4 *v,
 		float f)
 {
+#if HAVE_SSE
 	dst->m = _mm_min_ps(v->m, _mm_set1_ps(f));
+#else
+	dst->x = (v->x < f) ? v->x : f;
+	dst->y = (v->y < f) ? v->y : f;
+	dst->z = (v->z < f) ? v->z : f;
+	dst->w = (v->w < f) ? v->w : f;
+#endif
 }
 
 static inline void vec4_max(struct vec4 *dst, const struct vec4 *v1,
 		const struct vec4 *v2)
 {
+#if HAVE_SSE
 	dst->m = _mm_max_ps(v1->m, v2->m);
+#else
+	dst->x = (v1->x > v2->x) ? v1->x : v2->x;
+	dst->y = (v1->y > v2->y) ? v1->y : v2->y;
+	dst->z = (v1->z > v2->z) ? v1->z : v2->z;
+	dst->w = (v1->w > v2->w) ? v1->w : v2->w;
+#endif
 }
 
 static inline void vec4_maxf(struct vec4 *dst, const struct vec4 *v,
 		float f)
 {
+#if HAVE_SSE
 	dst->m = _mm_max_ps(v->m, _mm_set1_ps(f));
+#else
+	dst->x = (v->x > f) ? v->x : f;
+	dst->y = (v->y > f) ? v->y : f;
+	dst->z = (v->z > f) ? v->z : f;
+	dst->w = (v->w > f) ? v->w : f;
+#endif
 }
 
 static inline void vec4_abs(struct vec4 *dst, const struct vec4 *v)
