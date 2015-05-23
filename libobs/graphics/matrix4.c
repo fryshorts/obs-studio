@@ -22,10 +22,17 @@
 
 void matrix4_from_matrix3(struct matrix4 *dst, const struct matrix3 *m)
 {
+#if HAVE_SSE
 	dst->x.m = m->x.m;
 	dst->y.m = m->y.m;
 	dst->z.m = m->z.m;
 	dst->t.m = m->t.m;
+#else
+	vec4_from_vec3(&dst->x, &m->x);
+	vec4_from_vec3(&dst->y, &m->y);
+	vec4_from_vec3(&dst->z, &m->z);
+	vec4_from_vec3(&dst->t, &m->t);
+#endif
 	dst->t.w = 1.0f;
 }
 
@@ -267,7 +274,17 @@ void matrix4_transpose(struct matrix4 *dst, const struct matrix4 *m)
 		return;
 	}
 
-#ifdef NO_INTRINSICS
+#ifdef HAVE_SSE
+	__m128 a0 = _mm_unpacklo_ps(m->x.m, m->z.m);
+	__m128 a1 = _mm_unpacklo_ps(m->y.m, m->t.m);
+	__m128 a2 = _mm_unpackhi_ps(m->x.m, m->z.m);
+	__m128 a3 = _mm_unpackhi_ps(m->y.m, m->t.m);
+
+	dst->x.m = _mm_unpacklo_ps(a0, a1);
+	dst->y.m = _mm_unpackhi_ps(a0, a1);
+	dst->z.m = _mm_unpacklo_ps(a2, a3);
+	dst->t.m = _mm_unpackhi_ps(a2, a3);
+#else
 	dst->x.x = m->x.x;
 	dst->x.y = m->y.x;
 	dst->x.z = m->z.x;
@@ -284,15 +301,5 @@ void matrix4_transpose(struct matrix4 *dst, const struct matrix4 *m)
 	dst->t.y = m->y.w;
 	dst->t.z = m->z.w;
 	dst->t.w = m->t.w;
-#else
-	__m128 a0 = _mm_unpacklo_ps(m->x.m, m->z.m);
-	__m128 a1 = _mm_unpacklo_ps(m->y.m, m->t.m);
-	__m128 a2 = _mm_unpackhi_ps(m->x.m, m->z.m);
-	__m128 a3 = _mm_unpackhi_ps(m->y.m, m->t.m);
-
-	dst->x.m = _mm_unpacklo_ps(a0, a1);
-	dst->y.m = _mm_unpackhi_ps(a0, a1);
-	dst->z.m = _mm_unpacklo_ps(a2, a3);
-	dst->t.m = _mm_unpackhi_ps(a2, a3);
 #endif
 }

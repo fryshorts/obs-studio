@@ -35,10 +35,17 @@ struct matrix4 {
 
 static inline void matrix4_copy(struct matrix4 *dst, const struct matrix4 *m)
 {
+#if HAVE_SSE
 	dst->x.m = m->x.m;
 	dst->y.m = m->y.m;
 	dst->z.m = m->z.m;
 	dst->t.m = m->t.m;
+#else
+	vec4_copy(&dst->x, &m->x);
+	vec4_copy(&dst->y, &m->y);
+	vec4_copy(&dst->z, &m->z);
+	vec4_copy(&dst->t, &m->t);
+#endif
 }
 
 static inline void matrix4_identity(struct matrix4 *dst)
