@@ -29,10 +29,12 @@ extern "C" {
 struct matrix4;
 
 struct matrix3 {
-	struct vec3 x;
-	struct vec3 y;
-	struct vec3 z;
-	struct vec3 t;
+	union {
+		struct {
+			struct vec3 x, y, z, t;
+		};
+		struct vec3 ptr[4];
+	};
 };
 
 static inline void matrix3_copy(struct matrix3 *dst, const struct matrix3 *m)

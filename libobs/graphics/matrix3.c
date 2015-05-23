@@ -52,10 +52,17 @@ void matrix3_from_axisang(struct matrix3 *dst, const struct axisang *aa)
 
 void matrix3_from_matrix4(struct matrix3 *dst, const struct matrix4 *m)
 {
+#if HAVE_SSE
 	dst->x.m = m->x.m;
 	dst->y.m = m->y.m;
 	dst->z.m = m->z.m;
 	dst->t.m = m->t.m;
+#else
+	vec3_from_vec4(&dst->x, &m->x);
+	vec3_from_vec4(&dst->y, &m->y);
+	vec3_from_vec4(&dst->z, &m->z);
+	vec3_from_vec4(&dst->t, &m->t);
+#endif
 	dst->x.w = 0.0f;
 	dst->y.w = 0.0f;
 	dst->z.w = 0.0f;
@@ -107,6 +114,7 @@ void matrix3_scale(struct matrix3 *dst, const struct matrix3 *m,
 
 void matrix3_transpose(struct matrix3 *dst, const struct matrix3 *m)
 {
+#if HAVE_SSE
 	__m128 tmp1, tmp2;
 	vec3_rotate(&dst->t, &m->t, m);
 	vec3_neg(&dst->t, &dst->t);
@@ -116,6 +124,11 @@ void matrix3_transpose(struct matrix3 *dst, const struct matrix3 *m)
 	dst->x.m = _mm_shuffle_ps(tmp1, m->z.m, _MM_SHUFFLE(3, 0, 2, 0));
 	dst->y.m = _mm_shuffle_ps(tmp1, m->z.m, _MM_SHUFFLE(3, 1, 3, 1));
 	dst->z.m = _mm_shuffle_ps(tmp2, m->z.m, _MM_SHUFFLE(3, 2, 2, 0));
+#else
+	for (size_t i = 0; i < 4; ++i)
+		for (size_t j = 0; j < 4; ++j)
+			dst->ptr[i].ptr[j] = m->ptr[j].ptr[i];
+#endif
 }
 
 void matrix3_inv(struct matrix3 *dst, const struct matrix3 *m)
