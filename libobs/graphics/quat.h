@@ -20,7 +20,10 @@
 #include "../util/c99defs.h"
 #include "math-defs.h"
 #include "vec3.h"
+
+#if HAVE_SSE
 #include <xmmintrin.h>
+#endif
 
 /*
  * Quaternion math
@@ -42,37 +45,73 @@ struct quat {
 	union {
 		struct {float x, y, z, w;};
 		float ptr[4];
+#if HAVE_SSE
 		__m128 m;
+#endif
 	};
 };
 
 static inline void quat_identity(struct quat *q)
 {
+#if HAVE_SSE
 	q->m = _mm_setzero_ps();
+#else
+	q->x = 0.0f;
+	q->y = 0.0f;
+	q->z = 0.0f;
+#endif
 	q->w = 1.0f;
 }
 
 static inline void quat_set(struct quat *dst, float x, float y, float z,
 		float w)
 {
+#if HAVE_SSE
 	dst->m = _mm_set_ps(x, y, z, w);
+#else
+	dst->x = x;
+	dst->y = y;
+	dst->z = z;
+	dst->w = w;
+#endif
 }
 
 static inline void quat_copy(struct quat *dst, const struct quat *q)
 {
+#if HAVE_SSE
 	dst->m = q->m;
+#else
+	dst->x = q->x;
+	dst->y = q->y;
+	dst->z = q->z;
+	dst->w = q->w;
+#endif
 }
 
 static inline void quat_add(struct quat *dst, const struct quat *q1,
 		const struct quat *q2)
 {
+#if HAVE_SSE
 	dst->m = _mm_add_ps(q1->m, q2->m);
+#else
+	dst->x = q1->x + q2->x;
+	dst->y = q1->y + q2->y;
+	dst->z = q1->z + q2->z;
+	dst->w = q1->w + q2->w;
+#endif
 }
 
 static inline void quat_sub(struct quat *dst, const struct quat *q1,
 		const struct quat *q2)
 {
+#if HAVE_SSE
 	dst->m = _mm_sub_ps(q1->m, q2->m);
+#else
+	dst->x = q1->x - q2->x;
+	dst->y = q1->y - q2->y;
+	dst->z = q1->z - q2->z;
+	dst->w = q1->w - q2->w;
+#endif
 }
 
 EXPORT void quat_mul(struct quat *dst, const struct quat *q1,
@@ -81,34 +120,66 @@ EXPORT void quat_mul(struct quat *dst, const struct quat *q1,
 static inline void quat_addf(struct quat *dst, const struct quat *q,
 		float f)
 {
+#if HAVE_SSE
 	dst->m = _mm_add_ps(q->m, _mm_set1_ps(f));
+#else
+	dst->x = q->x + f;
+	dst->y = q->y + f;
+	dst->z = q->z + f;
+	dst->w = q->w + f;
+#endif
 }
 
 static inline void quat_subf(struct quat *dst, const struct quat *q,
 		float f)
 {
+#if HAVE_SSE
 	dst->m = _mm_sub_ps(q->m, _mm_set1_ps(f));
+#else
+	dst->x = q->x - f;
+	dst->y = q->y - f;
+	dst->z = q->z - f;
+	dst->w = q->w - f;
+#endif
 }
 
 static inline void quat_mulf(struct quat *dst, const struct quat *q,
 		float f)
 {
+#if HAVE_SSE
 	dst->m = _mm_mul_ps(q->m, _mm_set1_ps(f));
+#else
+	dst->x = q->x * f;
+	dst->y = q->y * f;
+	dst->z = q->z * f;
+	dst->w = q->w * f;
+#endif
 }
 
 static inline void quat_divf(struct quat *dst, const struct quat *q,
 		float f)
 {
+#if HAVE_SSE
 	dst->m = _mm_div_ps(q->m, _mm_set1_ps(f));
+#else
+	dst->x = q->x / f;
+	dst->y = q->y / f;
+	dst->z = q->z / f;
+	dst->w = q->w / f;
+#endif
 }
 
 static inline float quat_dot(const struct quat *q1, const struct quat *q2)
 {
+#if HAVE_SSE
 	struct vec3 add;
 	__m128 mul = _mm_mul_ps(q1->m, q2->m);
 	add.m = _mm_add_ps(_mm_movehl_ps(mul, mul), mul);
 	add.m = _mm_add_ps(_mm_shuffle_ps(add.m, add.m, 0x55), add.m);
 	return add.x;
+#else
+	return q1->x * q2->x + q1->y * q2->y + q1->z * q2->z + q1->w * q2->w;
+#endif
 }
 
 static inline void quat_inv(struct quat *dst, const struct quat *q)
@@ -145,9 +216,16 @@ static inline float quat_dist(const struct quat *q1, const struct quat *q2)
 static inline void quat_norm(struct quat *dst, const struct quat *q)
 {
 	float dot_val = quat_dot(q, q);
+#if HAVE_SSE
 	dst->m = (dot_val > 0.0f) ?
 		_mm_mul_ps(q->m, _mm_set1_ps(1.0f/sqrtf(dot_val))) :
 		_mm_setzero_ps();
+#else
+	if (dot_val > 0.0f)
+		quat_mulf(dst, q, 1.0f/sqrtf(dot_val));
+	else
+		quat_set(dst, 0.0f, 0.0f, 0.0f, 0.0f);
+#endif
 }
 
 static inline bool quat_close(const struct quat *q1, const struct quat *q2,

@@ -23,7 +23,13 @@
 
 static inline void quat_vec3(struct vec3 *v, const struct quat *q)
 {
+#if HAVE_SSE
 	v->m = q->m;
+#else
+	v->x = q->x;
+	v->y = q->y;
+	v->z = q->z;
+#endif
 	v->w = 0.0f;
 }
 
