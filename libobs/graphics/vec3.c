@@ -25,7 +25,13 @@
 
 void vec3_from_vec4(struct vec3 *dst, const struct vec4 *v)
 {
+#if HAVE_SSE
 	dst->m = v->m;
+#else
+	dst->x = v->x;
+	dst->y = v->y;
+	dst->z = v->z;
+#endif
 	dst->w = 0.0f;
 }
 
