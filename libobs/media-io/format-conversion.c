@@ -16,6 +16,8 @@
 ******************************************************************************/
 
 #include "format-conversion.h"
+
+#if 0
 #include <xmmintrin.h>
 #include <emmintrin.h>
 
@@ -82,13 +84,14 @@ do {                                                                          \
 	*(uint16_t*)(u_plane+chroma_pos) = (uint16_t)(packed_vals);           \
 	*(uint16_t*)(v_plane+chroma_pos) = (uint16_t)(packed_vals>>16);       \
 } while (false)
-
+#endif
 
 static FORCE_INLINE uint32_t min_uint32(uint32_t a, uint32_t b)
 {
 	return a < b ? a : b;
 }
 
+#if 0
 void compress_uyvx_to_i420(
 		const uint8_t *input, uint32_t in_linesize,
 		uint32_t start_y, uint32_t end_y,
@@ -201,6 +204,30 @@ void convert_uyvx_to_i444(
 		}
 	}
 }
+#else
+
+void compress_uyvx_to_i420(
+		const uint8_t *input, uint32_t in_linesize,
+		uint32_t start_y, uint32_t end_y,
+		uint8_t *output[], const uint32_t out_linesize[])
+{
+}
+
+void compress_uyvx_to_nv12(
+		const uint8_t *input, uint32_t in_linesize,
+		uint32_t start_y, uint32_t end_y,
+		uint8_t *output[], const uint32_t out_linesize[])
+{
+}
+
+void convert_uyvx_to_i444(
+		const uint8_t *input, uint32_t in_linesize,
+		uint32_t start_y, uint32_t end_y,
+		uint8_t *output[], const uint32_t out_linesize[])
+{
+}
+
+#endif
 
 void decompress_420(
 		const uint8_t *const input[], const uint32_t in_linesize[],
