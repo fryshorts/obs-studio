@@ -251,6 +251,22 @@ EXPORT void obs_volmeter_set_peak_hold(obs_volmeter_t *volmeter,
  */
 EXPORT unsigned int obs_volmeter_get_peak_hold(obs_volmeter_t *volmeter);
 
+/**
+ * @brief Convert from deflection to dB for the volume meter
+ * @param volmeter pointer to the volume meter object
+ * @param def deflection to convert to dB
+ * @return the dB value
+ */
+EXPORT float obs_volmeter_def2db(obs_volmeter_t *volmeter, const float def);
+
+/**
+ * @brief Convert from dB to deflection for the volume meter
+ * @param volmeter pointer to the volume meter object
+ * @param db dB value to convert to deflection
+ * @return the deflection value
+ */
+EXPORT float obs_volmeter_db2def(obs_volmeter_t *volmeter, const float db);
+
 typedef void (*obs_volmeter_updated_t)(void *param, float level,
 		float magnitude, float peak, float muted);
 

@@ -779,6 +779,30 @@ unsigned int obs_volmeter_get_peak_hold(obs_volmeter_t *volmeter)
 	return peakhold;
 }
 
+float obs_volmeter_def2db(obs_volmeter_t *volmeter, const float def)
+{
+	if (!volmeter)
+		return -INFINITY;
+
+	pthread_mutex_lock(&volmeter->mutex);
+	const float db = volmeter->db_to_pos(def);
+	pthread_mutex_unlock(&volmeter->mutex);
+
+	return db;
+}
+
+float obs_volmeter_db2def(obs_volmeter_t *volmeter, const float db)
+{
+	if (!volmeter)
+		return 0.0f;
+
+	pthread_mutex_lock(&volmeter->mutex);
+	const float def = volmeter->db_to_pos(db);
+	pthread_mutex_unlock(&volmeter->mutex);
+
+	return def;
+}
+
 void obs_volmeter_add_callback(obs_volmeter_t *volmeter,
 		obs_volmeter_updated_t callback, void *param)
 {
