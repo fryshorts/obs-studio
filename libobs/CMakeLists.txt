@@ -401,15 +401,6 @@ target_compile_definitions(libobs
 	PUBLIC
 		HAVE_OBSCONFIG_H)
 
-if(NOT MSVC)
-	target_compile_options(libobs
-		PUBLIC
-			-mmmx
-			-msse
-			-msse2)
-endif()
-
-
 target_compile_options(libobs
 	PUBLIC
 		"${THREADS_DEFINITIONS}")
