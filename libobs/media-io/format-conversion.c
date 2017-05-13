@@ -84,7 +84,6 @@ do {                                                                          \
 	*(uint16_t*)(u_plane+chroma_pos) = (uint16_t)(packed_vals);           \
 	*(uint16_t*)(v_plane+chroma_pos) = (uint16_t)(packed_vals>>16);       \
 } while (false)
-
 #endif
 
 static FORCE_INLINE uint32_t min_uint32(uint32_t a, uint32_t b)
