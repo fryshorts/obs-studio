@@ -17,7 +17,7 @@
 
 #include "format-conversion.h"
 
-#if 0
+#if HAVE_SSE
 #include <xmmintrin.h>
 #include <emmintrin.h>
 
@@ -84,6 +84,7 @@ do {                                                                          \
 	*(uint16_t*)(u_plane+chroma_pos) = (uint16_t)(packed_vals);           \
 	*(uint16_t*)(v_plane+chroma_pos) = (uint16_t)(packed_vals>>16);       \
 } while (false)
+
 #endif
 
 static FORCE_INLINE uint32_t min_uint32(uint32_t a, uint32_t b)
@@ -91,12 +92,12 @@ static FORCE_INLINE uint32_t min_uint32(uint32_t a, uint32_t b)
 	return a < b ? a : b;
 }
 
-#if 0
 void compress_uyvx_to_i420(
 		const uint8_t *input, uint32_t in_linesize,
 		uint32_t start_y, uint32_t end_y,
 		uint8_t *output[], const uint32_t out_linesize[])
 {
+#if HAVE_SSE
 	uint8_t  *lum_plane   = output[0];
 	uint8_t  *u_plane     = output[1];
 	uint8_t  *v_plane     = output[2];
@@ -128,6 +129,8 @@ void compress_uyvx_to_i420(
 					line1, line2, uv_mask);
 		}
 	}
+#else
+#endif
 }
 
 void compress_uyvx_to_nv12(
@@ -135,6 +138,7 @@ void compress_uyvx_to_nv12(
 		uint32_t start_y, uint32_t end_y,
 		uint8_t *output[], const uint32_t out_linesize[])
 {
+#if HAVE_SSE
 	uint8_t *lum_plane    = output[0];
 	uint8_t *chroma_plane = output[1];
 	uint32_t width        = min_uint32(in_linesize, out_linesize[0]);
@@ -164,6 +168,8 @@ void compress_uyvx_to_nv12(
 					line1, line2, uv_mask);
 		}
 	}
+#else
+#endif
 }
 
 void convert_uyvx_to_i444(
@@ -171,6 +177,7 @@ void convert_uyvx_to_i444(
 		uint32_t start_y, uint32_t end_y,
 		uint8_t *output[], const uint32_t out_linesize[])
 {
+#if HAVE_SSE
 	uint8_t  *lum_plane   = output[0];
 	uint8_t  *u_plane     = output[1];
 	uint8_t  *v_plane     = output[2];
@@ -203,31 +210,9 @@ void convert_uyvx_to_i444(
 					line1, line2, v_mask, 2);
 		}
 	}
-}
 #else
-
-void compress_uyvx_to_i420(
-		const uint8_t *input, uint32_t in_linesize,
-		uint32_t start_y, uint32_t end_y,
-		uint8_t *output[], const uint32_t out_linesize[])
-{
-}
-
-void compress_uyvx_to_nv12(
-		const uint8_t *input, uint32_t in_linesize,
-		uint32_t start_y, uint32_t end_y,
-		uint8_t *output[], const uint32_t out_linesize[])
-{
-}
-
-void convert_uyvx_to_i444(
-		const uint8_t *input, uint32_t in_linesize,
-		uint32_t start_y, uint32_t end_y,
-		uint8_t *output[], const uint32_t out_linesize[])
-{
-}
-
 #endif
+}
 
 void decompress_420(
 		const uint8_t *const input[], const uint32_t in_linesize[],
